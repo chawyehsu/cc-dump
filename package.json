@@ -4,16 +4,15 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "setup": "bun scripts/restore.ts && bun scripts/generate-types.ts && bun install --cwd claw-code",
-    "dev": "bun --define 'MACRO.VERSION=2.1.8888' ./claw-code/src/entrypoints/cli.tsx"
+    "dev": "cross-env DISABLE_TELEMETRY=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 bun --define 'MACRO.VERSION=2.1.8888' ./claw-code/src/entrypoints/cli.tsx"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "cross-env": "^10.1.0",
+    "source-map": "^0.7.6",
+    "tar": "^7.5.13"
   },
   "peerDependencies": {
     "typescript": "^5"
-  },
-  "dependencies": {
-    "source-map": "^0.7.6",
-    "tar": "^7.5.13"
   }
 }
