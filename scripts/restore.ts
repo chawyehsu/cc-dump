@@ -1,9 +1,23 @@
+import crypto from 'crypto'
 import fs from 'fs'
 import { SourceMapConsumer } from 'source-map'
 import { execSync } from 'child_process'
 import path, { join } from 'path'
 import { styleText } from 'node:util'
-import { PROJECT_ROOT, PACKAGE_IDENTIFIER, PACKAGE_FILENAME } from './constants'
+import { PROJECT_ROOT, PACKAGE_IDENTIFIER, PACKAGE_FILENAME, PACKAGE_CHECKSUM, NPM_REGISTRY } from './constants'
+
+function verifyChecksum(filepath: string, expectedChecksum: string): boolean {
+  console.log(`Verifying tarball integrity...`)
+  const fileBuffer = fs.readFileSync(filepath)
+  const hashSum = crypto.createHash('sha256')
+  hashSum.update(fileBuffer)
+  const hex = hashSum.digest('hex')
+  const isValid = hex === expectedChecksum
+  if (!isValid) {
+    fs.rmSync(filepath)
+  }
+  return isValid
+}
 
 // for windows: https://github.com/oven-sh/bun/issues/12696
 const needTarWorkaround = typeof Bun !== "undefined" && process.platform === "win32"
@@ -12,17 +26,23 @@ const { extract } = await import("tar")
 if (needTarWorkaround) delete process.env.__FAKE_PLATFORM__
 
 // download and extract
-const filename = join(import.meta.dir, '../.cache', PACKAGE_FILENAME)
+const cachedir = join(import.meta.dir, '../.cache')
+const filename = join(cachedir, PACKAGE_FILENAME)
 const project = join(import.meta.dir, '..', PROJECT_ROOT)
 
 if (!fs.existsSync(`${filename}`)) {
-  console.log(`Downloading ${PACKAGE_IDENTIFIER}...`)
+  const registry = process.env.NPM_MIRROR || NPM_REGISTRY
+  console.log(`Downloading ${PACKAGE_IDENTIFIER} using 'npm pack'...`)
   try {
-    execSync(`npm pack ${PACKAGE_IDENTIFIER}`)
+    execSync(`npm pack ${PACKAGE_IDENTIFIER} --pack-destination ${cachedir} --registry='${registry}'`)
   } catch (error: any) {
     console.warn(styleText(['yellow'], `Failed to download package tarball, you might put the tarball in .cache folder manually.`))
     process.exit(1)
   }
+}
+if (!verifyChecksum(filename, PACKAGE_CHECKSUM)) {
+  console.log(styleText(['red'], `Tarball checksum mismatch, please try again.`))
+  process.exit(1)
 }
 if (fs.existsSync(`${project}`)) {
   console.log(`Removing existing ${project} directory...`)
